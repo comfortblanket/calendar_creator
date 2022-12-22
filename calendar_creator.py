@@ -1,8 +1,59 @@
 import math
+import ctypes
 import calendar
 
 # https://pyfpdf.readthedocs.io/en/latest/index.html
 import fpdf
+
+
+def pdf_get_font_size(pdf):
+    """\
+    Get the pdf's current font size in points (1 point = 1/72 inches)
+    """
+    return pdf.font_size_pt
+
+
+def pdf_set_font(pdf, family, style, size, color):
+    """\
+    Combine call to pdf.set_font with call to pdf.set_text_color
+
+    Standard available fonts (others can be added -- see fpdf docs):
+        courier,   courierB,   courierI,   courierBI
+        helvetica, helveticaB, helveticaI, helveticaBI
+        times,     timesB,     timesI,     timesBI
+        symbol
+        zapfdingbats
+    """
+    pdf.set_font(family=family, style=style, size=size)
+    pdf.set_text_color(*color)
+
+
+def pdf_cell(pdf, x, y, w, h=0, txt="", border=0, ln=0, align="", fill=0, link=''):
+    """\
+    Combine call to pdf.set_xy with call to pdf.cell
+    """
+    pdf.set_xy(x=x, y=y)
+    pdf.cell(w=w, h=h, txt=txt, border=border, ln=ln, align=align, fill=fill, link=link)
+
+
+def pdf_text(pdf, x, y, txt, align="L"):
+    """\
+    Draw text in the given pdf at position x,y with alignment L(eft), C(enter), or R(ight).
+
+    If using align="L", text is drawn with x,y as the top left corner.
+    If using align="C", text is drawn with x,y as the top middle of the text.
+    If using align="R", text is drawn with x,y as the top right of the text.
+    """
+    align_adjust = 0
+
+    if align == "C":
+        align_adjust = pdf.get_string_width(txt) / 2
+    elif align == "R":
+        align_adjust = pdf.get_string_width(txt)
+    
+    font_size_pt = pdf_get_font_size(pdf)
+
+    pdf.text(x=x-align_adjust, y=y+font_size_pt/144, txt=txt)
 
 
 def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, month_last=None, events=None, settings=None):
@@ -17,7 +68,7 @@ def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, mon
 
     settings is a dict which has the following options in it, with default values in parentheses:
     
-        font-color default value to use for any non-specified font colors
+        font-color (0,0,0) default value to use for any non-specified font colors
         
         margin-left (0.5) left page margin in inches
         margin-right (0.5) right page margin in inches
@@ -40,6 +91,7 @@ def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, mon
         day-hsep (0.1) horizontal space separating days on the calendar
         
         margin-cell-left (0.05) padding in inches added to left of day contents
+        margin-cell-right (0.05) padding in inches added to right of day contents (used with Right and Center aligned text)
         margin-cell-top (0.1) padding in inches added to top of day contents
         
         date-color (font-color if given, else 0,0,0) tuple of 0-255 r,g,b values; color for date number
@@ -91,6 +143,7 @@ def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, mon
         pts-before (event-pts-before)
         pts-after (event-pts-after)
         
+        halign (L) horizontal alignment of text in date cell, value can be L, C, or R
         adjust-x-pts (0) amount in points to adjust placement of text in x direction
         adjust-y-pts (0) amount in points to adjust placement of text in y direction
         increment-line (True) whether to increment the line count after writing out the text of this event
@@ -138,16 +191,6 @@ def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, mon
             add_month_page_to_pdf(pdf, year, month, month_events, settings, page_width, page_height)
     
     pdf.output(save_fname, "F")
-
-
-def pdf_set_font(pdf, family, style, size, color):
-    pdf.set_font(family=family, style=style, size=size)
-    pdf.set_text_color(*color)
-
-
-def pdf_cell(pdf, x, y, w, h=0, txt="", border=0, ln=0, align="", fill=0, link=''):
-    pdf.set_xy(x=x, y=y)
-    pdf.cell(w=w, h=h, txt=txt, border=border, ln=ln, align=align, fill=fill, link=link)
 
 
 def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_width=11, page_height=8.5):
@@ -203,12 +246,12 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
         size   = title_font_size, 
         color  = settings.get("title-color", settings.get("font-color", (0,0,0) )), 
     )
-    pdf_cell(
+    pdf_text(
         pdf, 
-        x = left_margin,   y = usable_top_y, 
-        w = usable_width,  h = title_height, 
+        x = left_margin + usable_width/2, 
+        y = usable_top_y, 
         txt = title_text, 
-        border = "",       align = "C", 
+        align = "C", 
     )
 
     usable_top_y += title_height
@@ -230,12 +273,12 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
     for day_of_week in range(0, 7):
         header_x = left_margin + day_of_week*header_width
         header_text = calendar.day_name[day_of_week - 1]  # -1 to wrap Sunday to front of list
-        pdf_cell(
+        pdf_text(
             pdf, 
-            x = header_x,     y = usable_top_y, 
-            w = header_width, h = header_height, 
+            x = header_x + header_width/2, 
+            y = usable_top_y, 
             txt = header_text, 
-            border = "",      align = "C", 
+            align = "C", 
         )
 
     usable_top_y += header_height
@@ -268,8 +311,10 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
     date_area_y = usable_top_y
 
     # Margins for text inside the date cell
-    cell_left_margin = settings.get("margin-cell-left", 0.05)
-    cell_top_margin  = settings.get("margin-cell-top",  0.1)
+    cell_left_margin    = settings.get("margin-cell-left",   0.05)
+    cell_right_margin   = settings.get("margin-cell-right",  0.05)
+    cell_top_margin     = settings.get("margin-cell-top",    0.1)
+    # cell_bottom_margin  = settings.get("margin-cell-bottom", 0.1)
 
     # Counter variables for the loop
     date = 1 
@@ -300,10 +345,12 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
             size   = font_size, 
             color  = settings.get("date-color", settings.get("font-color", (0,0,0) )), 
         )
-        pdf.text(
+        pdf_text(
+            pdf, 
             x = day_x + cell_left_margin, 
-            y = day_y + cell_top_margin + font_height_inches/2, 
+            y = day_y + cell_top_margin, 
             txt = day_text, 
+            align = "L", 
         )
         
         # Events for this date
@@ -335,10 +382,21 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
                 color  = style.get("color", settings.get("event-color", (0,0,0) )), 
             )
             for line in detail_lines:
-                pdf.text(
-                    x = day_x + cell_left_margin + adjust_x, 
-                    y = event_y + size/144 + adjust_y, 
+                halign = style.get("halign", settings.get("event-halign", "L"))
+
+                if halign == "C":
+                    text_x = (day_x + cell_left_margin + adjust_x) + (day_width - cell_left_margin - cell_right_margin)/2
+                elif halign == "R":
+                    text_x = (day_x + cell_left_margin + adjust_x) + (day_width - cell_left_margin - cell_right_margin)
+                else:  # Left-align
+                    text_x = (day_x + cell_left_margin + adjust_x)
+
+                pdf_text(
+                    pdf, 
+                    x = text_x, 
+                    y = event_y + adjust_y, 
                     txt = line, 
+                    align = halign, 
                 )
                 
                 # Newline
@@ -379,12 +437,16 @@ if __name__ == "__main__":
         2020: {  # Year
             3: {  # Month
                 1: {  # Date
-                    "Another event!" : {}, 
+                    "Events everywhere!" : {}, 
                 }
             }, 
             4: {  # Month
                 9: {  # Date
-                    "Events everywhere!" : {}, 
+                    "An event!" : {
+                        "halign" : "R", 
+                        "color" : (255, 0, 0), 
+                        "font-family" : "times", 
+                    }, 
                 }, 
                 20: {  # Date
                     "Goodness me!" : {
@@ -393,9 +455,12 @@ if __name__ == "__main__":
                         "adjust-y-pts" : -15, 
                         "increment-line" : False, 
                     }, 
-                    "More and more of\nthem!" : {}, 
+                    "More and more of\nthem!" : {
+                        "halign" : "C", 
+                    }, 
                     "Last one..." : {
                         "pts-before" : 6, 
+                        "font-style" : "bu", 
                     }, 
                 }
             }

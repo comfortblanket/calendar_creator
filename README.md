@@ -37,6 +37,7 @@ The `create_calendar_pdf`(`save_fname`, `year_first`, `month_first`, `year_last=
     day-hsep (0.1) horizontal space separating days on the calendar, in inches
 
     margin-cell-left (0.05) padding in inches added to left of day contents
+    margin-cell-right (0.05) padding in inches added to right of day contents (used with Right and Center aligned text)
     margin-cell-top (0.1) padding in inches added to top of day contents
 
     date-color (font-color if given, else 0,0,0) tuple of 0-255 r,g,b values; color for date number
@@ -64,6 +65,7 @@ The event style dicts have the following options, with default values in parenth
     pts-before (event-pts-before)
     pts-after (event-pts-after)
 
+    halign (L) horizontal alignment of text in date cell, value can be L, C, or R
     adjust-x-pts (0) amount in points to adjust placement of text in x direction
     adjust-y-pts (0) amount in points to adjust placement of text in y direction
     increment-line (True) whether to increment the line count after writing out the text of this event
@@ -83,12 +85,16 @@ The event style dicts have the following options, with default values in parenth
         2020: {  # Year
             3: {  # Month
                 1: {  # Date
-                    "Another event!" : {}, 
+                    "Events everywhere!" : {}, 
                 }
             }, 
             4: {  # Month
                 9: {  # Date
-                    "Events everywhere!" : {}, 
+                    "An event!" : {
+                        "halign" : "R", 
+                        "color" : (255, 0, 0), 
+                        "font-family" : "times", 
+                    }, 
                 }, 
                 20: {  # Date
                     "Goodness me!" : {
@@ -97,9 +103,12 @@ The event style dicts have the following options, with default values in parenth
                         "adjust-y-pts" : -15, 
                         "increment-line" : False, 
                     }, 
-                    "More and more of\nthem!" : {}, 
+                    "More and more of\nthem!" : {
+                        "halign" : "C", 
+                    }, 
                     "Last one..." : {
                         "pts-before" : 6, 
+                        "font-style" : "bu", 
                     }, 
                 }
             }
