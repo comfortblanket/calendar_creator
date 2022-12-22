@@ -9,12 +9,12 @@ A quick and somewhat dirty set of Python functions to create somewhat customizab
 The `create_calendar_pdf`(`save_fname`, `year_first`, `month_first`, `year_last=None`, `month_last=None`, `events=None`, `settings=None`) function creates a PDF with monthly calenders in it. The result is saved to `save_fname`.
 
 `year_first` and `year_last` are integers which specify the first and last year from which to print months.
-`month_first` is an integer which specifies the first month in `year_first` to print. Value must be between 1 and 12 inclusive.
-`month_last` is an integer which specifies the last month in year_last to print. Value must be between 1 and 12 inclusive.
+
+`month_first` is an integer which specifies the first month in `year_first` to print. `month_last` is an integer which specifies the last month in `year_last` to print. Month values must be between 1 and 12 inclusive.
 
 `settings` is a dict which has the following options in it, with default values in parentheses:
 
-    font-color () default value to use for any non-specified font colors
+    font-color (0,0,0) default value to use for any non-specified font colors
 
     margin-left (0.5) left page margin in inches
     margin-right (0.5) right page margin in inches
@@ -33,8 +33,8 @@ The `create_calendar_pdf`(`save_fname`, `year_first`, `month_first`, `year_last=
     header-font-style (i)
     header-color (font-color if given, else 0,0,0) tuple of 0-255 r,g,b values
 
-    day-vsep (0.1) vertical space separating days on the calendar
-    day-hsep (0.1) horizontal space separating days on the calendar
+    day-vsep (0.1) vertical space separating days on the calendar, in inches
+    day-hsep (0.1) horizontal space separating days on the calendar, in inches
 
     margin-cell-left (0.05) padding in inches added to left of day contents
     margin-cell-top (0.1) padding in inches added to top of day contents
@@ -50,6 +50,8 @@ The `create_calendar_pdf`(`save_fname`, `year_first`, `month_first`, `year_last=
     event-color (0,0,0) default event font color
     event-pts-before (0) default amount of space in points to insert before an event
     event-pts-after (0) default amount of space in points to insert after an event
+
+As a general rule, all distances are specified in inches, unless they are specified to be in points (1 point = 1/72 inches).
 
 `events` is a dict with other nested dicts in it, which specify event details. `events` itself has integer years as keys which map to dicts for events in the given year. Each of those dicts has integer months (from 1-12) as keys which map to dicts for events in the given month. Each of those dicts has integer dates (from 1-31) as keys which map to dcits for events on that specific date. And those dicts map string keys which provide the text details of each event to another dict which contains additional style information for that event. To use the default style, just map it to an empty dict. See the below [Example](#example) section for more details.
 
