@@ -95,11 +95,12 @@ def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, mon
         adjust-y-pts (0) amount in points to adjust placement of text in y direction
         increment-line (True) whether to increment the line count after writing out the text of this event
     
-    Note that a good style to place some small text at the top of a date (given other default values) is:
+    Note that a good starting point for a style to place some small text at 
+    the top of a date (given other default values) is:
     {
         "font-size" : 8, 
         "adjust-x-pts" : 25,
-        "adjust-y-pts" : -25, 
+        "adjust-y-pts" : -15, 
         "increment-line" : False, 
     }
     """
