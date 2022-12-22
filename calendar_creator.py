@@ -56,6 +56,76 @@ def pdf_text(pdf, x, y, txt, align="L"):
     pdf.text(x=x-align_adjust, y=y+font_size_pt/144, txt=txt)
 
 
+def create_settings(settings):
+    created_settings = {
+        "margin-left" : 0.5, 
+        "margin-right" : 0.5, 
+        "margin-top" : 0.3, 
+        "margin-bottom" : 0.3, 
+
+        "title-size" : 16, 
+        "title-height" : 16 / 72, 
+        "title-font-family" : "helvetica", 
+        "title-font-style" : "b", 
+
+        "header-size" : 10, 
+        "header-height" : 10 / 72, 
+        "header-font-family" : "helvetica", 
+        "header-font-style" : "i", 
+
+        "day-vsep" : 0.1, 
+        "day-hsep" : 0.1, 
+
+        "margin-cell-left" : 0.05, 
+        "margin-cell-right" : 0.05, 
+        "margin-cell-top" : 0.1, 
+
+        "date-size" : 14, 
+        "date-font-family" : "helvetica", 
+        "date-font-style" : "b", 
+
+        "event-font-size" : 10, 
+        "event-font-family" : "helvetica", 
+        "event-font-style" : "i", 
+        "event-color" : (0,0,0), 
+        "event-pts-before" : 0, 
+        "event-pts-after" : 0, 
+    }
+
+    created_settings.update(settings)
+
+    if "font-color" not in created_settings:
+        created_settings["font-color"] = (0,0,0)
+
+    font_color = created_settings["font-color"]
+
+    for color_key in ["title-color", "header-color", "date-color"]:
+        if color_key not in created_settings:
+            created_settings[color_key] = font_color
+    
+    return created_settings
+
+
+def create_event_style(style, settings):
+    created_style = {
+        "font-size" : settings["event-font-size"], 
+        "font-family" : settings["event-font-family"], 
+        "font-style" : settings["event-font-style"], 
+        "color" : settings["event-color"], 
+        "pts-before" : settings["event-pts-before"], 
+        "pts-after" : settings["event-pts-after"], 
+
+        "halign" : "L", 
+        "adjust-x-pts" : 0, 
+        "adjust-y-pts" : 0, 
+        "increment-line" : True, 
+    }
+
+    created_style.update(style)
+
+    return created_style
+
+
 def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, month_last=None, events=None, settings=None):
     """\
     Creates a PDF with monthly calenders in it
@@ -174,6 +244,8 @@ def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, mon
     if events is None:
         events = {}
 
+    settings = create_settings({} if settings is None else settings)
+
     pdf = fpdf.FPDF(orientation="landscape", unit="in", format="letter")
     pdf.set_margins(0, 0, 0)  # Left, top, right
     pdf.set_auto_page_break(False, 0)  # Bottom
@@ -219,32 +291,32 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
     calendar.setfirstweekday(calendar.SUNDAY)
 
     if settings is None:
-        settings = {}
+        settings = create_settings({})
     
     pdf.add_page()
 
     # Page margins
-    left_margin   = settings.get("margin-left",   0.5)
-    right_margin  = settings.get("margin-right",  0.5)
-    top_margin    = settings.get("margin-top",    0.3)
-    bottom_margin = settings.get("margin-bottom", 0.3)
+    left_margin   = settings["margin-left"]
+    right_margin  = settings["margin-right"]
+    top_margin    = settings["margin-top"]
+    bottom_margin = settings["margin-bottom"]
 
     usable_width  = page_width  - left_margin - right_margin
     usable_top_y = top_margin
 
     # Title
 
-    title_font_size = settings.get("title-size", 16)
-    title_height = settings.get("title-height", title_font_size / 72)
+    title_font_size = settings["title-size"]
+    title_height = settings["title-height"]
     title_text = "{} {}".format(calendar.month_name[month], year)
 
     # DRAW title
     pdf_set_font(
         pdf, 
-        family = settings.get("title-font-family", "helvetica"), 
-        style  = settings.get("title-font-style", "b"), 
+        family = settings["title-font-family"], 
+        style  = settings["title-font-style"], 
         size   = title_font_size, 
-        color  = settings.get("title-color", settings.get("font-color", (0,0,0) )), 
+        color  = settings["title-color"], 
     )
     pdf_text(
         pdf, 
@@ -258,17 +330,17 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
 
     # Header
 
-    header_font_size = settings.get("header-size", 10)
-    header_height = settings.get("header-height", header_font_size / 72)
+    header_font_size = settings["header-size"]
+    header_height = settings["header-height"]
     header_width = usable_width / 7  # Width of individual day-of-week header title boxes
     
     # DRAW header
     pdf_set_font(
         pdf, 
-        family = settings.get("header-font-family", "helvetica"), 
-        style  = settings.get("header-font-style", "i"), 
+        family = settings["header-font-family"], 
+        style  = settings["header-font-style"], 
         size   = header_font_size, 
-        color  = settings.get("header-color", settings.get("font-color", (0,0,0) )), 
+        color  = settings["header-color"], 
     )
     for day_of_week in range(0, 7):
         header_x = left_margin + day_of_week*header_width
@@ -299,8 +371,8 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
     usable_height = page_height - usable_top_y - bottom_margin
 
     # Separation between days
-    day_vsep = settings.get("day-vsep", 0.1)
-    day_hsep = settings.get("day-hsep", 0.1)
+    day_vsep = settings["day-vsep"]
+    day_hsep = settings["day-hsep"]
     
     # Dimensions of each day - split up usable space
     day_width = (usable_width - 6*day_hsep) / 7
@@ -311,10 +383,10 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
     date_area_y = usable_top_y
 
     # Margins for text inside the date cell
-    cell_left_margin    = settings.get("margin-cell-left",   0.05)
-    cell_right_margin   = settings.get("margin-cell-right",  0.05)
-    cell_top_margin     = settings.get("margin-cell-top",    0.1)
-    # cell_bottom_margin  = settings.get("margin-cell-bottom", 0.1)
+    cell_left_margin    = settings["margin-cell-left"]
+    cell_right_margin   = settings["margin-cell-right"]
+    cell_top_margin     = settings["margin-cell-top"]
+    # cell_bottom_margin  = settings["margin-cell-bottom"]
 
     # Counter variables for the loop
     date = 1 
@@ -334,16 +406,16 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
 
         # Date number
         day_text = "{}".format(date)
-        font_size = settings.get("date-size", 14)
+        font_size = settings["date-size"]
         font_height_inches = font_size / 72
 
         # DRAW date number
         pdf_set_font(
             pdf, 
-            family = settings.get("date-font-family", "helvetica"), 
-            style  = settings.get("date-font-style",  "b"), 
+            family = settings["date-font-family"], 
+            style  = settings["date-font-style"], 
             size   = font_size, 
-            color  = settings.get("date-color", settings.get("font-color", (0,0,0) )), 
+            color  = settings["date-color"], 
         )
         pdf_text(
             pdf, 
@@ -358,31 +430,32 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
         # This will be updated as we draw each event, and is in inches (like most things)
         event_y = day_y + cell_top_margin + font_height_inches
 
-        for details, style in events.get(date, {}).items():
+        for details, specific_style in events.get(date, {}).items():
+            style = create_event_style(specific_style, settings)
 
             # Adjust extra space before the event
-            event_y += style.get("pts-before", settings.get("event-pts-before", 0)) / 72
+            event_y += style["pts-before"] / 72
 
             # Amount to special-adjust the position for this event
-            adjust_x = style.get("adjust-x-pts", 0) / 72
-            adjust_y = style.get("adjust-y-pts", 0) / 72
+            adjust_x = style["adjust-x-pts"] / 72
+            adjust_y = style["adjust-y-pts"] / 72
 
             # Split apart the event details on newlines to get the different lines of text
             detail_lines = details.split("\n")
 
             # Font size for this event
-            size = style.get("font-size", settings.get("event-font-size", 10))
+            size = style["font-size"]
             
             # DRAW event details
             pdf_set_font(
                 pdf, 
-                family = style.get("font-family", settings.get("event-font-family", "helvetica")), 
-                style  = style.get("font-style", settings.get("event-font-style", "i")), 
+                family = style["font-family"], 
+                style  = style["font-style"], 
                 size   = size, 
-                color  = style.get("color", settings.get("event-color", (0,0,0) )), 
+                color  = style["color"], 
             )
             for line in detail_lines:
-                halign = style.get("halign", settings.get("event-halign", "L"))
+                halign = style["halign"]
 
                 if halign == "C":
                     text_x = (day_x + cell_left_margin + adjust_x) + (day_width - cell_left_margin - cell_right_margin)/2
@@ -406,11 +479,11 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
             # not supposed to increment the line count, then let's back off a 
             # single line. This allows any newlines in the details to be used, 
             # but removes the last one.
-            if detail_lines and not style.get("increment-line", True):
+            if detail_lines and not style["increment-line"]:
                 event_y -= size/72
 
             # Adjust extra space after the event
-            event_y += style.get("pts-after", settings.get("event-pts-after", 0)) / 72
+            event_y += style["pts-after"] / 72
 
         # Now we'll move on to the next date
         date += 1
