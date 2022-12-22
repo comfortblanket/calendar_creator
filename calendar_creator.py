@@ -5,7 +5,7 @@ import calendar
 import fpdf
 
 
-def create_pdf(save_fname, year_first, month_first, year_last=None, month_last=None, events=None, settings=None):
+def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, month_last=None, events=None, settings=None):
     """\
     Creates a PDF with monthly calenders in it
 
@@ -378,23 +378,26 @@ if __name__ == "__main__":
         2020: {  # Year
             3: {  # Month
                 1: {  # Date
-                    "Events everywhere!" : {}, 
+                    "Another event!" : {}, 
                 }
             }, 
             4: {  # Month
+                9: {  # Date
+                    "Events everywhere!" : {}, 
+                }, 
                 20: {  # Date
-                    "More and more of them!" : {}, 
                     "Goodness me!" : {
                         "font-size" : 8, 
                         "adjust-x-pts" : 25,
-                        "adjust-y-pts" : -25, 
+                        "adjust-y-pts" : -15, 
                         "increment-line" : False, 
                     }, 
+                    "More and more of\nthem!" : {}, 
                     "Last one..." : {
-
-                    }
+                        "pts-before" : 6, 
+                    }, 
                 }
             }
         }
     }
-    create_pdf(save_fname="test.pdf", year_first=2020, month_first=2, month_last=5, events=events)
+    create_calendar_pdf(save_fname="test.pdf", year_first=2020, month_first=2, month_last=5, events=events)
