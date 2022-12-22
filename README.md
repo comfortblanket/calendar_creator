@@ -1,7 +1,7 @@
 # calendar_creator
 A quick and somewhat dirty set of Python functions to create somewhat customizable and printable PDF calendars with custom events.
 
-![example-month](https://user-images.githubusercontent.com/30023105/209036973-eca53e5b-4d92-4d60-b5ec-9cfa09dcac98.png)
+![example-month](https://user-images.githubusercontent.com/30023105/209226011-61261442-091b-43a8-a509-bb032380b93b.png)
 *A month created by the code in the [Example](#example) section of this Readme*
 
 ## Basic Usage
