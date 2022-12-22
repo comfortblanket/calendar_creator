@@ -1,7 +1,7 @@
 # calendar_creator
 A quick and somewhat dirty set of Python functions to create somewhat customizable and printable PDF calendars with custom events.
 
-![example-month](https://user-images.githubusercontent.com/30023105/209226011-61261442-091b-43a8-a509-bb032380b93b.png)
+![example-month](https://user-images.githubusercontent.com/30023105/209236278-ad501e66-59df-4a03-99df-ed1988671fd7.png)
 *A month created by the code in the [Example](#example) section of this Readme*
 
 ## Basic Usage
@@ -15,42 +15,49 @@ The `create_calendar_pdf`(`save_fname`, `year_first`, `month_first`, `year_last=
 `settings` is a dict which has the following options in it, with default values in parentheses:
 
     font-color (0,0,0) default value to use for any non-specified font colors
-
+    
     margin-left (0.5) left page margin in inches
     margin-right (0.5) right page margin in inches
     margin-top (0.3) top page margin in inches
     margin-bottom (0.3) bottom page margin in inches
-
+    
     title-size (16) font size in points
     title-height (title-size converted to inches) vertical space used for the title in inches
     title-font-family (helvetica)
     title-font-style (b)
     title-color (font-color if given, else 0,0,0) tuple of 0-255 r,g,b values
-
+    
     header-size (10) day of week header font size in points
     header-height (header-size converted to inches) vertical space used for day of week headers in inches
     header-font-family (helvetica)
     header-font-style (i)
     header-color (font-color if given, else 0,0,0) tuple of 0-255 r,g,b values
-
-    day-vsep (0.1) vertical space separating days on the calendar, in inches
-    day-hsep (0.1) horizontal space separating days on the calendar, in inches
-
+    
+    day-vsep (0.1) vertical space separating days on the calendar
+    day-hsep (0.1) horizontal space separating days on the calendar
+    
     margin-cell-left (0.05) padding in inches added to left of day contents
     margin-cell-right (0.05) padding in inches added to right of day contents (used with Right and Center aligned text)
     margin-cell-top (0.1) padding in inches added to top of day contents
-
+    
     date-color (font-color if given, else 0,0,0) tuple of 0-255 r,g,b values; color for date number
     date-size (14) font size for date number in points
     date-font-family (helvetica)
     date-font-style (b)
-
+    
     event-font-size (10) default event font size
     event-font-family (helvetica) default event font family
     event-font-style (i) default event font style
     event-color (0,0,0) default event font color
     event-pts-before (0) default amount of space in points to insert before an event
     event-pts-after (0) default amount of space in points to insert after an event
+    
+    special-event-font-size (8) default special event font size
+    special-event-font-family (helvetica) default special event font family
+    special-event-font-style () default special event font style
+    special-event-color (0,0,0) default special event font color
+    special-event-pts-before (0) default amount of space in points to insert before a special event
+    special-event-pts-after (0) default amount of space in points to insert after a special event
 
 As a general rule, all distances are specified in inches, unless they are specified to be in points (1 point = 1/72 inches).
 
@@ -58,17 +65,21 @@ As a general rule, all distances are specified in inches, unless they are specif
 
 The event style dicts have the following options, with default values in parentheses (many defaults come from the `settings` dict above):
 
-    font-size (event-font-size)
-    font-family (event-font-family)
-    font-style (event-font-style)
-    color (event-color)
-    pts-before (event-pts-before)
-    pts-after (event-pts-after)
+    special (False) whether this is a special event
 
-    halign (L) horizontal alignment of text in date cell, value can be L, C, or R
+    font-size (special-event-font-size if special, else event-font-size)
+    font-family (special-event-font-family if special, else event-font-family)
+    font-style (special-event-font-style if special, else event-font-style)
+    color (special-event-color if special, else event-color)
+    pts-before (special-event-pts-before if special, else event-pts-before)
+    pts-after (special-event-pts-after if special, else event-pts-after)
+    
+    halign (C if special, else L) horizontal alignment of text in date cell, value can be L, C, or R
     adjust-x-pts (0) amount in points to adjust placement of text in x direction
-    adjust-y-pts (0) amount in points to adjust placement of text in y direction
+    adjust-y-pts (-72*(margin-cell-top)/2 if special, else 0) amount in points to adjust placement of text in y direction
     increment-line (True) whether to increment the line count after writing out the text of this event
+
+Note that special events are simply regular events with slightly different defaults, and they are placed in the date cell in a column which begins to the right of the date's number, instead of below it. These events are tracked separately from regular events, and so they can easily overlap with each other if you have too many special events and you don't adjust positions.
 
 ### Example
 
@@ -98,10 +109,7 @@ The event style dicts have the following options, with default values in parenth
                 }, 
                 20: {  # Date
                     "Goodness me!" : {
-                        "font-size" : 8, 
-                        "adjust-x-pts" : 25,
-                        "adjust-y-pts" : -15, 
-                        "increment-line" : False, 
+                        "special" : True, 
                     }, 
                     "More and more of\nthem!" : {
                         "halign" : "C", 

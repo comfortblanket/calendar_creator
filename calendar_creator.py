@@ -90,6 +90,13 @@ def create_settings(settings):
         "event-color" : (0,0,0), 
         "event-pts-before" : 0, 
         "event-pts-after" : 0, 
+        
+        "special-event-font-size" : 6, 
+        "special-event-font-family" : "helvetica", 
+        "special-event-font-style" : "", 
+        "special-event-color" : (0,0,0), 
+        "special-event-pts-before" : 0, 
+        "special-event-pts-after" : 0, 
     }
 
     created_settings.update(settings)
@@ -107,17 +114,21 @@ def create_settings(settings):
 
 
 def create_event_style(style, settings):
+    is_special = style.get("special", False)
+    
     created_style = {
-        "font-size" : settings["event-font-size"], 
-        "font-family" : settings["event-font-family"], 
-        "font-style" : settings["event-font-style"], 
-        "color" : settings["event-color"], 
-        "pts-before" : settings["event-pts-before"], 
-        "pts-after" : settings["event-pts-after"], 
+        "special" : is_special, 
 
-        "halign" : "L", 
+        "font-size" : settings["special-event-font-size"] if is_special else settings["event-font-size"], 
+        "font-family" : settings["special-event-font-family"] if is_special else settings["event-font-family"], 
+        "font-style" : settings["special-event-font-style"] if is_special else settings["event-font-style"], 
+        "color" : settings["special-event-color"] if is_special else settings["event-color"], 
+        "pts-before" : settings["special-event-pts-before"] if is_special else settings["event-pts-before"], 
+        "pts-after" : settings["special-event-pts-after"] if is_special else settings["event-pts-after"], 
+
+        "halign" : "C" if is_special else "L", 
         "adjust-x-pts" : 0, 
-        "adjust-y-pts" : 0, 
+        "adjust-y-pts" : -72*settings["margin-cell-top"]/2 if is_special else 0, 
         "increment-line" : True, 
     }
 
@@ -175,6 +186,13 @@ def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, mon
         event-color (0,0,0) default event font color
         event-pts-before (0) default amount of space in points to insert before an event
         event-pts-after (0) default amount of space in points to insert after an event
+        
+        special-event-font-size (8) default special event font size
+        special-event-font-family (helvetica) default special event font family
+        special-event-font-style () default special event font style
+        special-event-color (0,0,0) default special event font color
+        special-event-pts-before (0) default amount of space in points to insert before a special event
+        special-event-pts-after (0) default amount of space in points to insert after a special event
 
     events is a dict of the following example structure:
     {
@@ -206,26 +224,26 @@ def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, mon
     values in parentheses (many defaults come from the settings dict 
     above):
 
-        font-size (event-font-size)
-        font-family (event-font-family)
-        font-style (event-font-style)
-        color (event-color)
-        pts-before (event-pts-before)
-        pts-after (event-pts-after)
+        special (False) whether this is a special event
+
+        font-size (special-event-font-size if special, else event-font-size)
+        font-family (special-event-font-family if special, else event-font-family)
+        font-style (special-event-font-style if special, else event-font-style)
+        color (special-event-color if special, else event-color)
+        pts-before (special-event-pts-before if special, else event-pts-before)
+        pts-after (special-event-pts-after if special, else event-pts-after)
         
-        halign (L) horizontal alignment of text in date cell, value can be L, C, or R
+        halign (C if special, else L) horizontal alignment of text in date cell, value can be L, C, or R
         adjust-x-pts (0) amount in points to adjust placement of text in x direction
-        adjust-y-pts (0) amount in points to adjust placement of text in y direction
+        adjust-y-pts (-72*(margin-cell-top)/2 if special, else 0) amount in points to adjust placement of text in y direction
         increment-line (True) whether to increment the line count after writing out the text of this event
     
-    Note that a good starting point for a style to place some small text at 
-    the top of a date (given other default values) is:
-    {
-        "font-size" : 8, 
-        "adjust-x-pts" : 25,
-        "adjust-y-pts" : -15, 
-        "increment-line" : False, 
-    }
+    Note that special events are simply regular events with slightly different 
+    defaults, and they are placed in the date cell in a column which begins to 
+    the right of the date's number, instead of below it. These events are 
+    tracked separately from regular events, and so they can easily overlap 
+    with each other if you have too many special events and you don't adjust 
+    positions.
     """
 
     assert year_last is None or (year_first <= year_last), \
@@ -387,6 +405,12 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
     cell_right_margin   = settings["margin-cell-right"]
     cell_top_margin     = settings["margin-cell-top"]
     # cell_bottom_margin  = settings["margin-cell-bottom"]
+    cell_margins = (
+        cell_left_margin, 
+        cell_right_margin, 
+        cell_top_margin, 
+        # cell_bottom_margin, 
+    )
 
     # Counter variables for the loop
     date = 1 
@@ -417,6 +441,8 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
             size   = font_size, 
             color  = settings["date-color"], 
         )
+        special_event_x = day_x + cell_left_margin + pdf.get_string_width(day_text)
+        special_event_width = day_x + day_width - special_event_x
         pdf_text(
             pdf, 
             x = day_x + cell_left_margin, 
@@ -427,63 +453,17 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
         
         # Events for this date
 
-        # This will be updated as we draw each event, and is in inches (like most things)
+        # These will be updated as we draw each event, and are in inches (like most things)
         event_y = day_y + cell_top_margin + font_height_inches
+        special_event_y = day_y + cell_top_margin
 
         for details, specific_style in events.get(date, {}).items():
             style = create_event_style(specific_style, settings)
 
-            # Adjust extra space before the event
-            event_y += style["pts-before"] / 72
-
-            # Amount to special-adjust the position for this event
-            adjust_x = style["adjust-x-pts"] / 72
-            adjust_y = style["adjust-y-pts"] / 72
-
-            # Split apart the event details on newlines to get the different lines of text
-            detail_lines = details.split("\n")
-
-            # Font size for this event
-            size = style["font-size"]
-            
-            # DRAW event details
-            pdf_set_font(
-                pdf, 
-                family = style["font-family"], 
-                style  = style["font-style"], 
-                size   = size, 
-                color  = style["color"], 
-            )
-            for line in detail_lines:
-                halign = style["halign"]
-
-                if halign == "C":
-                    text_x = (day_x + cell_left_margin + adjust_x) + (day_width - cell_left_margin - cell_right_margin)/2
-                elif halign == "R":
-                    text_x = (day_x + cell_left_margin + adjust_x) + (day_width - cell_left_margin - cell_right_margin)
-                else:  # Left-align
-                    text_x = (day_x + cell_left_margin + adjust_x)
-
-                pdf_text(
-                    pdf, 
-                    x = text_x, 
-                    y = event_y + adjust_y, 
-                    txt = line, 
-                    align = halign, 
-                )
-                
-                # Newline
-                event_y += size/72
-            
-            # After drawing the event, IF we had any lines to draw AND we are 
-            # not supposed to increment the line count, then let's back off a 
-            # single line. This allows any newlines in the details to be used, 
-            # but removes the last one.
-            if detail_lines and not style["increment-line"]:
-                event_y -= size/72
-
-            # Adjust extra space after the event
-            event_y += style["pts-after"] / 72
+            if style["special"]:
+                special_event_y = draw_event(pdf, special_event_x, special_event_width, details, style, special_event_y, cell_margins)
+            else:
+                event_y = draw_event(pdf, day_x, day_width, details, style, event_y, cell_margins)
 
         # Now we'll move on to the next date
         date += 1
@@ -494,6 +474,71 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
             weeknum += 1
         else:
             weekday += 1
+
+
+def draw_event(pdf, day_x, day_width, details, style, event_y, cell_margins):
+    
+    # Adjust extra space before the event
+    event_y += style["pts-before"] / 72
+
+    # Margins for text inside the date cell
+    (
+        cell_left_margin, 
+        cell_right_margin, 
+        cell_top_margin, 
+        # cell_bottom_margin, 
+    ) = cell_margins
+
+    # Amount to special-adjust the position for this event
+    adjust_x = style["adjust-x-pts"] / 72
+    adjust_y = style["adjust-y-pts"] / 72
+
+    # Split apart the event details on newlines to get the different lines of text
+    detail_lines = details.split("\n")
+
+    # Font size for this event
+    size = style["font-size"]
+    
+    # DRAW event details
+    pdf_set_font(
+        pdf, 
+        family = style["font-family"], 
+        style  = style["font-style"], 
+        size   = size, 
+        color  = style["color"], 
+    )
+    for line in detail_lines:
+        halign = style["halign"]
+
+        if halign == "C":
+            text_x = (day_x + cell_left_margin + adjust_x) + (day_width - cell_left_margin - cell_right_margin)/2
+        elif halign == "R":
+            text_x = (day_x + cell_left_margin + adjust_x) + (day_width - cell_left_margin - cell_right_margin)
+        else:  # Left-align
+            text_x = (day_x + cell_left_margin + adjust_x)
+
+        pdf_text(
+            pdf, 
+            x = text_x, 
+            y = event_y + adjust_y, 
+            txt = line, 
+            align = halign, 
+        )
+        
+        # Newline
+        event_y += size/72
+    
+    # After drawing the event, IF we had any lines to draw AND we are 
+    # not supposed to increment the line count, then let's back off a 
+    # single line. This allows any newlines in the details to be used, 
+    # but removes the last one.
+    if detail_lines and not style["increment-line"]:
+        event_y -= size/72
+
+    # Adjust extra space after the event
+    event_y += style["pts-after"] / 72
+
+    return event_y
 
 
 if __name__ == "__main__":
@@ -523,10 +568,7 @@ if __name__ == "__main__":
                 }, 
                 20: {  # Date
                     "Goodness me!" : {
-                        "font-size" : 8, 
-                        "adjust-x-pts" : 25,
-                        "adjust-y-pts" : -15, 
-                        "increment-line" : False, 
+                        "special" : True, 
                     }, 
                     "More and more of\nthem!" : {
                         "halign" : "C", 
