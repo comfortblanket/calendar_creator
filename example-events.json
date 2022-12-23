@@ -1,0 +1,45 @@
+{
+    "1992": {
+        "12": {
+            "9": {
+                "Today is Dec 9, 1992" : {}, 
+                "Here is another event" : {}
+            }
+        }
+    }, 
+    "2020": {
+        "3": {
+            "1": {
+                "Events everywhere!" : {}
+            }
+        }, 
+        "4": {
+            "9": {
+                "An event!" : {
+                    "halign" : "R", 
+                    "color" : [255, 0, 0], 
+                    "font-family" : "times"
+                }
+            }, 
+            "20": {
+                "Goodness me!" : {
+                    "special" : "header"
+                }, 
+                "More and more of\nthem!" : {
+                    "halign" : "C"
+                }, 
+                "Last one..." : {
+                    "pts-before" : 6, 
+                    "font-style" : "bu"
+                }, 
+                "Oh wait, one more..." : {
+                    "special" : "footer", 
+                    "halign" : "R"
+                }, 
+                "No, this is the last one!" : {
+                    "special" : "footer"
+                }
+            }
+        }
+    }
+}

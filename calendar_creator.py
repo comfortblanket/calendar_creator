@@ -1,9 +1,20 @@
 import math
 import calendar
 
+import datetime
+import argparse
+import json
+
 # https://pyfpdf.readthedocs.io/en/latest/index.html
 import fpdf
 
+
+__doc__ = """\
+A quick and somewhat dirty set of Python functions to create somewhat customizable and printable PDF calendars with custom events
+"""
+
+######################################################################
+# PDF helper functions
 
 def pdf_get_font_size(pdf):
     """\
@@ -54,6 +65,8 @@ def pdf_text(pdf, x, y, txt, align="L"):
 
     pdf.text(x=x-align_adjust, y=y+font_size_pt/144, txt=txt)
 
+######################################################################
+# Settings and default values
 
 def create_settings(settings):
     created_settings = {
@@ -138,6 +151,8 @@ def create_event_style(style, settings):
 
     return created_style
 
+######################################################################
+# Central functionality
 
 def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, month_last=None, events=None, settings=None):
     """\
@@ -616,8 +631,10 @@ def draw_event_upward(pdf, day_x, day_width, details, style, event_y, cell_margi
 
     return event_y
 
+######################################################################
+# Example usage
 
-if __name__ == "__main__":
+def run_example(outfile="example_output.pdf"):
     events = {
         1992: {  # Year
             12: {  # Month
@@ -664,4 +681,185 @@ if __name__ == "__main__":
             }
         }
     }
-    create_calendar_pdf(save_fname="test.pdf", year_first=2020, month_first=2, month_last=5, events=events)
+    create_calendar_pdf(save_fname=f"{outfile}", year_first=2020, month_first=2, month_last=5, events=events)
+
+
+def print_example(outfile="example_output.pdf"):
+    import inspect
+    example_source = "\n".join(
+        line[4:]  # Remove four-space indentation
+        for line in 
+        inspect.getsource(run_example).split("\n")[1:]  # All but first line of source
+    )
+    print(example_source.replace("f\"{outfile}\"", f"\"{outfile}\""))
+
+######################################################################
+# Commandline functions
+
+def setup_argparser():
+    argparser = argparse.ArgumentParser(description=__doc__)
+    subparsers = argparser.add_subparsers(
+        help="sub-command help", 
+    )
+
+    # Example parser
+
+    example_parser = subparsers.add_parser(
+        "show-example", 
+        aliases = ["example"], 
+        help = "show and run an example, then quit", 
+    )
+    example_parser.set_defaults(subparser_name="show-example")
+
+    example_parser.add_argument(
+        "outfile", 
+        metavar = "OUT_FILE", 
+        default = "example_output.pdf", 
+        nargs = "?", 
+        type = str, 
+        help = "the pdf filename to output", 
+    )
+
+    # Normal json parser
+
+    json_parser = subparsers.add_parser(
+        "use-json", 
+        aliases = ["json"], 
+        help = "create calendar based on json input files", 
+    )
+    json_parser.set_defaults(subparser_name="use-json")
+
+    json_parser.add_argument(
+        "outfile", 
+        metavar = "OUT_FILE", 
+        type = str, 
+        help = "the pdf filename to output", 
+    )
+    
+    json_parser.add_argument(
+        "--events", 
+        metavar = "EVENTS_FILE", 
+        type = str, 
+        default = None, 
+        help = "a json settings file", 
+    )
+    
+    json_parser.add_argument(
+        "--settings", 
+        metavar = "SETTINGS_FILE", 
+        type = str, 
+        default = None, 
+        help = "a json settings file", 
+    )
+
+    json_parser.add_argument(
+        "--year_first", 
+        metavar = "YEAR1", 
+        type = int, 
+        default = datetime.datetime.today().year, 
+        help = "the first year to include in the calendar", 
+    )
+
+    json_parser.add_argument(
+        "--month_first", 
+        metavar = "MONTH1", 
+        type = int, 
+        default = datetime.datetime.today().month, 
+        help = "the first from YEAR1 to include in the calendar", 
+    )
+
+    json_parser.add_argument(
+        "--year_last", 
+        metavar = "YEAR2", 
+        type = int, 
+        default = None, 
+        help = "the last year to include in the calendar", 
+    )
+
+    json_parser.add_argument(
+        "--month_last", 
+        metavar = "MONTH2", 
+        type = int, 
+        default = None, 
+        help = "the last month from YEAR2 to include in the calendar", 
+    )
+
+    return argparser
+
+
+def convert_json_to_dict(json_dict):
+    new_dict = {}
+    for year_str, year_dict in json_dict.items():
+        new_year = {}
+
+        for month_str, month_details in year_dict.items():
+            new_month = {}
+
+            for day_str, events in month_details.items():
+                if events:
+                    new_month[int(day_str)] = events
+            
+            if new_month:
+                new_year[int(month_str)] = new_month
+        
+        if new_year:
+            new_dict[int(year_str)] = new_year
+    
+    return new_dict
+
+        
+
+
+def main(*passed_args):
+    argparser = setup_argparser()
+
+    if passed_args:
+        args = argparser.parse_args(passed_args)
+    else:
+        args = argparser.parse_args()
+
+    if args.subparser_name == "show-example":
+        print_example(args.outfile)
+        run_example(args.outfile)
+
+    elif args.subparser_name == "use-json":
+        events = None
+        if args.events:
+            with open(args.events, "r") as fid:
+                events = convert_json_to_dict(
+                    json.load(fid)
+                )
+
+        settings = None
+        if args.settings:
+            with open(args.settings, "r") as fid:
+                settings = convert_json_to_dict(
+                    json.load(fid)
+                )
+        
+        create_calendar_pdf(
+            args.outfile, 
+            args.year_first, 
+            args.month_first, 
+            args.year_last, 
+            args.month_last, 
+            events, 
+            settings
+        )
+
+    else:
+        raise ValueError(f"Unknown subcommand '{args.subparser_name}'")
+
+######################################################################
+
+if __name__ == "__main__":
+    # main(
+    #     "json", 
+    #     "--events", "example-events.json", 
+    #     "--year_first", "2020", 
+    #     "--month_first", "2", 
+    #     "--month_last", "5", 
+    #     "out.pdf", 
+    # )
+    
+    main()
