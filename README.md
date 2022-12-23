@@ -1,7 +1,7 @@
 # calendar_creator
 A quick and somewhat dirty set of Python functions to create somewhat customizable and printable PDF calendars with custom events.
 
-![example-month](https://user-images.githubusercontent.com/30023105/209236278-ad501e66-59df-4a03-99df-ed1988671fd7.png)
+![example-month](https://user-images.githubusercontent.com/30023105/209266455-29c79d37-70a2-4446-821d-5afdacfc88e5.png)
 *A month created by the code in the [Example](#example) section of this Readme*
 
 ## Basic Usage
@@ -37,8 +37,9 @@ The `create_calendar_pdf`(`save_fname`, `year_first`, `month_first`, `year_last=
     day-hsep (0.1) horizontal space separating days on the calendar
     
     margin-cell-left (0.05) padding in inches added to left of day contents
-    margin-cell-right (0.05) padding in inches added to right of day contents (used with Right and Center aligned text)
+    margin-cell-right (0) padding in inches added to right of day contents (used with Right and Center aligned text)
     margin-cell-top (0.1) padding in inches added to top of day contents
+    margin-cell-bottom (0) padding in inches added to top of day contents (used with special=footer style)
     
     date-color (font-color if given, else 0,0,0) tuple of 0-255 r,g,b values; color for date number
     date-size (14) font size for date number in points
@@ -65,7 +66,7 @@ As a general rule, all distances are specified in inches, unless they are specif
 
 The event style dicts have the following options, with default values in parentheses (many defaults come from the `settings` dict above):
 
-    special (False) whether this is a special event
+    special (normal) type of special event- can be normal, header, or footer
 
     font-size (special-event-font-size if special, else event-font-size)
     font-family (special-event-font-family if special, else event-font-family)
@@ -74,12 +75,12 @@ The event style dicts have the following options, with default values in parenth
     pts-before (special-event-pts-before if special, else event-pts-before)
     pts-after (special-event-pts-after if special, else event-pts-after)
     
-    halign (C if special, else L) horizontal alignment of text in date cell, value can be L, C, or R
+    halign (C if special=header, else L) horizontal alignment of text in date cell, value can be L, C, or R
     adjust-x-pts (0) amount in points to adjust placement of text in x direction
-    adjust-y-pts (-72*(margin-cell-top)/2 if special, else 0) amount in points to adjust placement of text in y direction
-    increment-line (True) whether to increment the line count after writing out the text of this event
+    adjust-y-pts (-72*(margin-cell-top)/2 if special=header, else 0) amount in points to adjust placement of text in y direction
+    increment-line (True) whether to increment the line count after writing out the text of this event (not used with special=footer)
 
-Note that special events are simply regular events with slightly different defaults, and they are placed in the date cell in a column which begins to the right of the date's number, instead of below it. These events are tracked separately from regular events, and so they can easily overlap with each other if you have too many special events and you don't adjust positions.
+Note that special events are simply regular events with slightly different defaults. "header" events are placed in the date cell in a column which begins to the right of the date's number, instead of below it. "footer" events begin at the bottom of the date cell, and sequential ones move upward instead of down. These events are tracked separately from regular events, and so they can easily overlap with each other if you have too many special events and you don't adjust positions.
 
 ### Example
 
@@ -109,7 +110,7 @@ Note that special events are simply regular events with slightly different defau
                 }, 
                 20: {  # Date
                     "Goodness me!" : {
-                        "special" : True, 
+                        "special" : "header", 
                     }, 
                     "More and more of\nthem!" : {
                         "halign" : "C", 
@@ -117,6 +118,13 @@ Note that special events are simply regular events with slightly different defau
                     "Last one..." : {
                         "pts-before" : 6, 
                         "font-style" : "bu", 
+                    }, 
+                    "Oh wait, one more..." : {
+                        "special" : "footer", 
+                        "halign" : "R", 
+                    }, 
+                    "No, this is the last one!" : {
+                        "special" : "footer", 
                     }, 
                 }
             }

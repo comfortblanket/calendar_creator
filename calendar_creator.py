@@ -1,5 +1,4 @@
 import math
-import ctypes
 import calendar
 
 # https://pyfpdf.readthedocs.io/en/latest/index.html
@@ -77,8 +76,9 @@ def create_settings(settings):
         "day-hsep" : 0.1, 
 
         "margin-cell-left" : 0.05, 
-        "margin-cell-right" : 0.05, 
+        "margin-cell-right" : 0, 
         "margin-cell-top" : 0.1, 
+        "margin-cell-bottom" : 0, 
 
         "date-size" : 14, 
         "date-font-family" : "helvetica", 
@@ -114,10 +114,12 @@ def create_settings(settings):
 
 
 def create_event_style(style, settings):
-    is_special = style.get("special", False)
+    special = style.get("special", "normal")
+    is_special = special in ("header", "footer")
+    is_header = special == "header"
     
     created_style = {
-        "special" : is_special, 
+        "special" : special, 
 
         "font-size" : settings["special-event-font-size"] if is_special else settings["event-font-size"], 
         "font-family" : settings["special-event-font-family"] if is_special else settings["event-font-family"], 
@@ -126,9 +128,9 @@ def create_event_style(style, settings):
         "pts-before" : settings["special-event-pts-before"] if is_special else settings["event-pts-before"], 
         "pts-after" : settings["special-event-pts-after"] if is_special else settings["event-pts-after"], 
 
-        "halign" : "C" if is_special else "L", 
+        "halign" : "C" if is_header else "L", 
         "adjust-x-pts" : 0, 
-        "adjust-y-pts" : -72*settings["margin-cell-top"]/2 if is_special else 0, 
+        "adjust-y-pts" : -72*settings["margin-cell-top"]/2 if is_header else 0, 
         "increment-line" : True, 
     }
 
@@ -172,8 +174,9 @@ def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, mon
         day-hsep (0.1) horizontal space separating days on the calendar
         
         margin-cell-left (0.05) padding in inches added to left of day contents
-        margin-cell-right (0.05) padding in inches added to right of day contents (used with Right and Center aligned text)
+        margin-cell-right (0) padding in inches added to right of day contents (used with Right and Center aligned text)
         margin-cell-top (0.1) padding in inches added to top of day contents
+        margin-cell-bottom (0) padding in inches added to top of day contents (used with special=footer style)
         
         date-color (font-color if given, else 0,0,0) tuple of 0-255 r,g,b values; color for date number
         date-size (14) font size for date number in points
@@ -224,7 +227,7 @@ def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, mon
     values in parentheses (many defaults come from the settings dict 
     above):
 
-        special (False) whether this is a special event
+        special (normal) type of special event- can be normal, header, or footer
 
         font-size (special-event-font-size if special, else event-font-size)
         font-family (special-event-font-family if special, else event-font-family)
@@ -233,17 +236,18 @@ def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, mon
         pts-before (special-event-pts-before if special, else event-pts-before)
         pts-after (special-event-pts-after if special, else event-pts-after)
         
-        halign (C if special, else L) horizontal alignment of text in date cell, value can be L, C, or R
+        halign (C if special=header, else L) horizontal alignment of text in date cell, value can be L, C, or R
         adjust-x-pts (0) amount in points to adjust placement of text in x direction
-        adjust-y-pts (-72*(margin-cell-top)/2 if special, else 0) amount in points to adjust placement of text in y direction
+        adjust-y-pts (-72*(margin-cell-top)/2 if special=header, else 0) amount in points to adjust placement of text in y direction
         increment-line (True) whether to increment the line count after writing out the text of this event
     
     Note that special events are simply regular events with slightly different 
-    defaults, and they are placed in the date cell in a column which begins to 
-    the right of the date's number, instead of below it. These events are 
-    tracked separately from regular events, and so they can easily overlap 
-    with each other if you have too many special events and you don't adjust 
-    positions.
+    defaults. "header" events are placed in the date cell in a column which 
+    begins to the right of the date's number, instead of below it. "footer" 
+    events begin at the bottom of the date cell, and sequential ones move 
+    upward instead of down. These events are tracked separately from regular 
+    events, and so they can easily overlap with each other if you have too 
+    many special events and you don't adjust positions.
     """
 
     assert year_last is None or (year_first <= year_last), \
@@ -404,12 +408,12 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
     cell_left_margin    = settings["margin-cell-left"]
     cell_right_margin   = settings["margin-cell-right"]
     cell_top_margin     = settings["margin-cell-top"]
-    # cell_bottom_margin  = settings["margin-cell-bottom"]
+    cell_bottom_margin  = settings["margin-cell-bottom"]
     cell_margins = (
         cell_left_margin, 
         cell_right_margin, 
         cell_top_margin, 
-        # cell_bottom_margin, 
+        cell_bottom_margin, 
     )
 
     # Counter variables for the loop
@@ -441,8 +445,8 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
             size   = font_size, 
             color  = settings["date-color"], 
         )
-        special_event_x = day_x + cell_left_margin + pdf.get_string_width(day_text)
-        special_event_width = day_x + day_width - special_event_x
+        header_event_x = day_x + cell_left_margin + pdf.get_string_width(day_text)
+        header_event_width = day_x + day_width - header_event_x
         pdf_text(
             pdf, 
             x = day_x + cell_left_margin, 
@@ -455,13 +459,16 @@ def add_month_page_to_pdf(pdf, year, month, events=None, settings=None, page_wid
 
         # These will be updated as we draw each event, and are in inches (like most things)
         event_y = day_y + cell_top_margin + font_height_inches
-        special_event_y = day_y + cell_top_margin
+        header_event_y = day_y + cell_top_margin
+        footer_event_y = day_y + day_height - cell_bottom_margin
 
         for details, specific_style in events.get(date, {}).items():
             style = create_event_style(specific_style, settings)
 
-            if style["special"]:
-                special_event_y = draw_event(pdf, special_event_x, special_event_width, details, style, special_event_y, cell_margins)
+            if style["special"] == "header":
+                header_event_y = draw_event(pdf, header_event_x, header_event_width, details, style, header_event_y, cell_margins)
+            elif style["special"] == "footer":
+                footer_event_y = draw_event_upward(pdf, day_x, day_width, details, style, footer_event_y, cell_margins)
             else:
                 event_y = draw_event(pdf, day_x, day_width, details, style, event_y, cell_margins)
 
@@ -486,7 +493,7 @@ def draw_event(pdf, day_x, day_width, details, style, event_y, cell_margins):
         cell_left_margin, 
         cell_right_margin, 
         cell_top_margin, 
-        # cell_bottom_margin, 
+        cell_bottom_margin, 
     ) = cell_margins
 
     # Amount to special-adjust the position for this event
@@ -511,15 +518,15 @@ def draw_event(pdf, day_x, day_width, details, style, event_y, cell_margins):
         halign = style["halign"]
 
         if halign == "C":
-            text_x = (day_x + cell_left_margin + adjust_x) + (day_width - cell_left_margin - cell_right_margin)/2
+            text_x = (day_x + cell_left_margin) + (day_width - cell_left_margin - cell_right_margin)/2
         elif halign == "R":
-            text_x = (day_x + cell_left_margin + adjust_x) + (day_width - cell_left_margin - cell_right_margin)
+            text_x = (day_x + cell_left_margin) + (day_width - cell_left_margin - cell_right_margin)
         else:  # Left-align
-            text_x = (day_x + cell_left_margin + adjust_x)
+            text_x = (day_x + cell_left_margin)
 
         pdf_text(
             pdf, 
-            x = text_x, 
+            x = text_x + adjust_x, 
             y = event_y + adjust_y, 
             txt = line, 
             align = halign, 
@@ -537,6 +544,75 @@ def draw_event(pdf, day_x, day_width, details, style, event_y, cell_margins):
 
     # Adjust extra space after the event
     event_y += style["pts-after"] / 72
+
+    return event_y
+
+
+def draw_event_upward(pdf, day_x, day_width, details, style, event_y, cell_margins):
+    """\
+    This text drawing is unique, in that the point specified to draw 
+    at (day_x, event_y) is the bottom left corner of where the text 
+    should be, instead of the top left. This is because we don't 
+    know how much to move upward until we know the font (and 
+    therefore height) of the text.
+    """
+    
+    # Adjust extra space after (below) the event
+    event_y -= style["pts-after"] / 72
+
+    # Margins for text inside the date cell
+    (
+        cell_left_margin, 
+        cell_right_margin, 
+        cell_top_margin, 
+        cell_bottom_margin, 
+    ) = cell_margins
+
+    # Amount to special-adjust the position for this event
+    adjust_x = style["adjust-x-pts"] / 72
+    adjust_y = style["adjust-y-pts"] / 72
+
+    # Split apart the event details on newlines to get the different lines of text
+    detail_lines = details.split("\n")
+
+    # Font size for this event
+    size = style["font-size"]
+    
+    # DRAW event details
+    pdf_set_font(
+        pdf, 
+        family = style["font-family"], 
+        style  = style["font-style"], 
+        size   = size, 
+        color  = style["color"], 
+    )
+    event_y -= len(detail_lines) * size/72
+    for line in detail_lines:
+
+        halign = style["halign"]
+
+        if halign == "C":
+            text_x = (day_x + cell_left_margin) + (day_width - cell_left_margin - cell_right_margin)/2
+        elif halign == "R":
+            text_x = (day_x + cell_left_margin) + (day_width - cell_left_margin - cell_right_margin)
+        else:  # Left-align
+            text_x = (day_x + cell_left_margin)
+
+        pdf_text(
+            pdf, 
+            x = text_x + adjust_x, 
+            y = event_y + adjust_y, 
+            txt = line, 
+            align = halign, 
+        )
+        
+        # Newline
+        event_y += size/72
+    
+    event_y -= len(detail_lines) * size/72
+
+    # Adjust extra space before (above) the event
+    event_y -= style["pts-before"] / 72
 
     return event_y
 
@@ -568,7 +644,7 @@ if __name__ == "__main__":
                 }, 
                 20: {  # Date
                     "Goodness me!" : {
-                        "special" : True, 
+                        "special" : "header", 
                     }, 
                     "More and more of\nthem!" : {
                         "halign" : "C", 
@@ -576,6 +652,13 @@ if __name__ == "__main__":
                     "Last one..." : {
                         "pts-before" : 6, 
                         "font-style" : "bu", 
+                    }, 
+                    "Oh wait, one more..." : {
+                        "special" : "footer", 
+                        "halign" : "R", 
+                    }, 
+                    "No, this is the last one!" : {
+                        "special" : "footer", 
                     }, 
                 }
             }
