@@ -97,7 +97,7 @@ def create_settings(settings):
         "date-font-family" : "helvetica", 
         "date-font-style" : "b", 
 
-        "event-font-size" : 10, 
+        "event-font-size" : 8, 
         "event-font-family" : "helvetica", 
         "event-font-style" : "i", 
         "event-color" : (0,0,0), 
@@ -153,6 +153,29 @@ def create_event_style(style, settings):
 
 ######################################################################
 # Central functionality
+
+
+def year_month_gen(year_first, month_first, year_last=None, month_last=None):
+
+    assert year_last is None or (year_first <= year_last), \
+        "year_last must be None, or else no smaller than year_first"
+    assert 0 < month_first <= 12, \
+        "month_first should be in a value from 1 to 12 inclusive"
+    assert month_last is None or (0 < month_last <= 12), \
+        "month_last must be None, or else should be in a value from 1 to 12 inclusive"
+
+    if year_last is None:
+        year_last = year_first
+    
+    if month_last is None:
+        month_last = month_first
+
+    for year in range(year_first, year_last + 1):
+        first_month_in_this_year = 1 if (year > year_first) else month_first
+        last_month_in_this_year = 12 if (year < year_last) else month_last
+
+        for month in range(first_month_in_this_year, last_month_in_this_year + 1):
+            yield (year, month)
 
 def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, month_last=None, events=None, settings=None):
     """\
@@ -265,19 +288,6 @@ def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, mon
     many special events and you don't adjust positions.
     """
 
-    assert year_last is None or (year_first <= year_last), \
-        "year_last must be None, or else no smaller than year_first"
-    assert 0 < month_first <= 12, \
-        "month_first should be in a value from 1 to 12 inclusive"
-    assert month_last is None or (0 < month_last <= 12), \
-        "month_last must be None, or else should be in a value from 1 to 12 inclusive"
-
-    if year_last is None:
-        year_last = year_first
-    
-    if month_last is None:
-        month_last = month_first
-
     if events is None:
         events = {}
 
@@ -291,13 +301,9 @@ def create_calendar_pdf(save_fname, year_first, month_first, year_last=None, mon
     page_width = 11
     page_height = 8.5
 
-    for year in range(year_first, year_last + 1):
-        first_month_in_this_year = 1 if (year > year_first) else month_first
-        last_month_in_this_year = 12 if (year < year_last) else month_last
-
-        for month in range(first_month_in_this_year, last_month_in_this_year + 1):
-            month_events = events.get(year, {}).get(month, {})
-            add_month_page_to_pdf(pdf, year, month, month_events, settings, page_width, page_height)
+    for year, month in year_month_gen(year_first, month_first, year_last, month_last):
+        month_events = events.get(year, {}).get(month, {})
+        add_month_page_to_pdf(pdf, year, month, month_events, settings, page_width, page_height)
     
     pdf.output(save_fname, "F")
 
@@ -731,22 +737,32 @@ def setup_argparser():
 
     json_parser.add_argument(
         "outfile", 
-        metavar = "OUT_FILE", 
+        metavar = "OUTPUT", 
         type = str, 
         help = "the pdf filename to output", 
     )
     
     json_parser.add_argument(
         "--events", 
-        metavar = "EVENTS_FILE", 
+        metavar = "EVENTS", 
         type = str, 
+        nargs = "+", 
         default = None, 
-        help = "a json settings file", 
+        help = "a json events file", 
+    )
+    
+    json_parser.add_argument(
+        "--yearly", 
+        metavar = "YEARLY", 
+        type = str, 
+        nargs = "+", 
+        default = None, 
+        help = "a json events file without years", 
     )
     
     json_parser.add_argument(
         "--settings", 
-        metavar = "SETTINGS_FILE", 
+        metavar = "SETTINGS", 
         type = str, 
         default = None, 
         help = "a json settings file", 
@@ -787,27 +803,70 @@ def setup_argparser():
     return argparser
 
 
-def convert_json_to_dict(json_dict):
-    new_dict = {}
-    for year_str, year_dict in json_dict.items():
+def convert_json_to_dict(json_dict, skip_year=False):
+
+    if skip_year:
         new_year = {}
+        for month_str, month_details in json_dict.items():
+                new_month = {}
 
-        for month_str, month_details in year_dict.items():
-            new_month = {}
-
-            for day_str, events in month_details.items():
-                if events:
-                    new_month[int(day_str)] = events
+                for day_str, events in month_details.items():
+                    if events:
+                        new_month[int(day_str)] = events
+                
+                if new_month:
+                    new_year[int(month_str)] = new_month
+        
+        return new_year
+        
+    else:
+        new_dict = {}
+        for year_str, year_dict in json_dict.items():
+            new_year = convert_json_to_dict(year_dict, skip_year=True)
             
-            if new_month:
-                new_year[int(month_str)] = new_month
-        
-        if new_year:
-            new_dict[int(year_str)] = new_year
-    
-    return new_dict
+            if new_year:
+                new_dict[int(year_str)] = new_year
 
-        
+        return new_dict
+
+
+def update_event(events, year, month, day, details, style_dict, remove_first=False):
+    if year not in events:
+        events[year] = {}
+    year_dict = events[year]
+    
+    if month not in year_dict:
+        year_dict[month] = {}
+    month_dict = year_dict[month]
+
+    if day not in month_dict:
+        month_dict[day] = {}
+    day_dict = month_dict[day]
+
+    if remove_first or details not in day_dict:
+        day_dict[details] = style_dict
+    else:
+        day_dict[details].update(style_dict)
+
+
+def event_items_gen(events):
+    for year, year_dict in events.items():
+        for month, month_details in year_dict.items():
+            for day, events_dict in month_details.items():
+                for details, style_dict in events_dict.items():
+                    yield (year, month, day, details, style_dict)
+
+
+def yearly_items_gen(events):
+    for month, month_details in events.items():
+        for day, events_dict in month_details.items():
+            for details, style_dict in events_dict.items():
+                yield (month, day, details, style_dict)
+
+
+def update_event_dict(events, new_dict):
+    for (year, month, day, details, style_dict) in event_items_gen(new_dict):
+        update_event(events, year, month, day, details, style_dict)
 
 
 def main(*passed_args):
@@ -825,10 +884,24 @@ def main(*passed_args):
     elif args.subparser_name == "use-json":
         events = None
         if args.events:
-            with open(args.events, "r") as fid:
-                events = convert_json_to_dict(
-                    json.load(fid)
-                )
+            
+            if events is None:
+                events = {}
+            
+            for event_fname in args.yearly:
+                with open(event_fname, "r") as fid:
+                    yearly = convert_json_to_dict(json.load(fid), skip_year=True)
+                
+                for year in range(args.year_first, args.year_last + 1):
+                    for (month, day, details, style_dict) in yearly_items_gen(yearly):
+                            update_event(events, year, month, day, details, style_dict)
+            
+            for event_fname in args.events:
+                with open(event_fname, "r") as fid:
+                    update_event_dict(
+                        events, 
+                        convert_json_to_dict(json.load(fid), skip_year=False), 
+                    )
 
         settings = None
         if args.settings:
@@ -861,5 +934,16 @@ if __name__ == "__main__":
     #     "--month_last", "5", 
     #     "out.pdf", 
     # )
-    
-    main()
+
+    # main()
+
+    main(
+        "json", 
+        "--events", "../monthly_event_fetcher/bj_events_2022.12-2024.01.json", 
+        "--yearly", "birthdays.json", 
+        "--year_first", "2022", 
+        "--month_first", "12", 
+        "--year_last", "2024", 
+        "--month_last", "1", 
+        "calendar_2022.12-2024.01.pdf", 
+    )
